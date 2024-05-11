@@ -1,0 +1,3 @@
+[submodule "bullmq-addc"]
+	path = bullmq-addc
+	url = https://github.com/NSKernel/bullmq-addc.git
