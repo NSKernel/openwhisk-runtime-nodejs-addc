@@ -96,8 +96,21 @@ function initializeActionHandler(message) {
                 //  The module to require.
                 let whatToRequire = index !== undefined ? path.join(moduleDir, index) : moduleDir;
                 let handler = assertMainIsFunction(eval('require("' + whatToRequire + '").' + main));
-                if (handler === 0)
-                    return Promise.resolve({ type: QUEUE_PAYLOAD_TYPE_FILE, whatToRequire: whatToRequire, main: main, code: null });
+                if (handler === 0) {
+                    var localenv = {};
+                    if (message.env && typeof message.env == 'object') {
+                        //console.log("Init message: " + JSON.stringify(message));
+                        Object.keys(message.env).forEach(k => {
+                            let val = message.env[k];
+                            if (typeof val !== 'object' || val == null) {
+                                localenv[k] = val ? val.toString() : "";
+                            } else {
+                                localenv[k] = JSON.stringify(val);
+                            }
+                        });
+                    }
+                    return Promise.resolve({ type: QUEUE_PAYLOAD_TYPE_FILE, whatToRequire: whatToRequire, main: main, code: null, env: localenv });
+                }
                 else
                     return Promise.reject("Action entrypoint '" + main + "' is not a function.");
             })
@@ -114,8 +127,21 @@ function initializeActionHandler(message) {
             }
         })()`;
         let handler = assertMainIsFunction(eval(code));
-        if (handler === 0)
-            return Promise.resolve({ type: QUEUE_PAYLOAD_TYPE_CODE, whatToRequire: null, main: null, code: code });
+        if (handler === 0) {
+            var localenv = {};
+            if (message.env && typeof message.env == 'object') {
+                //console.log("Init message: " + JSON.stringify(message));
+                Object.keys(message.env).forEach(k => {
+                    let val = message.env[k];
+                    if (typeof val !== 'object' || val == null) {
+                        localenv[k] = val ? val.toString() : "";
+                    } else {
+                        localenv[k] = JSON.stringify(val);
+                    }
+                });
+            }
+            return Promise.resolve({ type: QUEUE_PAYLOAD_TYPE_CODE, whatToRequire: null, main: null, code: code, env: localenv });
+        }
         else
             return Promise.reject("Action entrypoint '" + message.main + "' is not a function.");
     } catch (e) {

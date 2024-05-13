@@ -30,7 +30,9 @@ function NodeActionService(config) {
 
     let status = Status.ready;
     let server = undefined;
-    let userCodeRunner = undefined;
+    // let userCodeRunner = undefined;
+
+    let actionMap = new Map();
 
     function setStatus(newStatus) {
         if (status !== Status.stopped) {
@@ -59,9 +61,9 @@ function NodeActionService(config) {
      * created a NodeActionRunner.
      * @returns {boolean}
      */
-    this.initialized = function isInitialized(){
+    /*this.initialized = function isInitialized(){
         return (typeof userCodeRunner !== 'undefined');
-    };
+    };*/
 
     /**
      * Starts the server.
@@ -83,7 +85,7 @@ function NodeActionService(config) {
      *  req.body = { main: String, code: String, binary: Boolean }
      */
     this.initCode = function initCode(req) {
-        if (status === Status.ready && userCodeRunner === undefined) {
+        if (status === Status.ready) {
             setStatus(Status.starting);
 
             let body = req.body || {};
@@ -103,10 +105,6 @@ function NodeActionService(config) {
                 let msg = 'Missing main/no code to execute.';
                 return Promise.reject(errorMessage(403, msg));
             }
-        } else if (userCodeRunner !== undefined) {
-            let msg = 'Cannot initialize the action more than once.';
-            console.error('Internal system error:', msg);
-            return Promise.reject(errorMessage(403, msg));
         } else {
             let msg = `System not ready, status is ${status}.`;
             console.error('Internal system error:', msg);
@@ -123,10 +121,7 @@ function NodeActionService(config) {
      * req.body = { value: Object, meta { activationId : int } }
      */
     this.runCode = function runCode(req) {
-        if (status === Status.ready && userCodeRunner !== undefined) {
-            if (!ignoreRunStatus) {
-                setStatus(Status.running);
-            }
+        if (status === Status.ready) {
 
             // these are defensive checks against the expected interface invariants
             let msg = req && req.body || {};
@@ -139,9 +134,6 @@ function NodeActionService(config) {
             }
 
             return doRun(msg).then(result => {
-                if (!ignoreRunStatus) {
-                    setStatus(Status.ready);
-                }
                 if (typeof result !== 'object') {
                     return errorMessage(502, 'The action did not return a dictionary.');
                 } else {
@@ -153,14 +145,15 @@ function NodeActionService(config) {
                 return Promise.reject(errorMessage(502, msg));
             });
         } else {
-            let msg = userCodeRunner ? `System not ready, status is ${status}.` : 'System not initialized.';
+            let msg = `System not ready, status is ${status}.`;
             console.error('Internal system error:', msg);
             return Promise.reject(errorMessage(403, msg));
         }
     };
 
     function doInit(message) {
-        if (message.env && typeof message.env == 'object') {
+        /*if (message.env && typeof message.env == 'object') {
+            //console.log("Init message: " + JSON.stringify(message));
             Object.keys(message.env).forEach(k => {
                 let val = message.env[k];
                 if (typeof val !== 'object' || val == null) {
@@ -169,11 +162,13 @@ function NodeActionService(config) {
                     process.env[k] = JSON.stringify(val);
                 }
             });
-        }
+        }*/
 
         return initializeActionHandler(message)
             .then(handler => {
-                userCodeRunner = new NodeActionRunner(handler);
+                // userCodeRunner = new NodeActionRunner(handler);
+                actionMap.set(message.env.__OW_ACTION_NAME, new NodeActionRunner(handler));
+                console.log("Action " + message.env.__OW_ACTION_NAME + " added");
             })
             // emit error to activation log then flush the logs as this is the end of the activation
             .catch(error => {
@@ -184,27 +179,44 @@ function NodeActionService(config) {
     }
 
     function doRun(msg) {
+        // console.log("Run message: " + JSON.stringify(msg));
         // Move per-activation keys to process env. vars with __OW_ (reserved) prefix
-        Object.keys(msg).forEach(k => {
+        /*Object.keys(msg).forEach(k => {
             if (typeof msg[k] === 'string' && k !== 'value') {
                 let envVariable = '__OW_' + k.toUpperCase();
                 process.env[envVariable] = msg[k];
             }
-        });
+        });*/
 
-        return userCodeRunner
-            .run(msg.value)
-            .then(result => {
-                if (typeof result !== 'object') {
-                    console.error(`Result must be of type object but has type "${typeof result}":`, result);
-                }
-                writeMarkers();
-                return result;
-            }).catch(error => {
-                console.error(error);
-                writeMarkers();
-                return Promise.reject(error);
-            });
+        // Get the runner
+        let actionName = msg["action_name"];
+        if (actionName != undefined) {
+            let runner = actionMap.get(actionName);
+            console.log("Calling " + actionName + "...");
+            if (runner != undefined) {
+                return runner
+                    .run(msg.value)
+                    .then(result => {
+                        if (typeof result !== 'object') {
+                            console.error(`Result must be of type object but has type "${typeof result}":`, result);
+                        }
+                        writeMarkers();
+                        return result;
+                    }).catch(error => {
+                        console.error(error);
+                        writeMarkers();
+                        return Promise.reject(error);
+                    });
+            }
+            else {
+                console.error("I can't find the action with the name of " + actionName);
+                return Promise.reject("NO ACTION FOUND");
+            }    
+        }
+        else {
+            console.error("I can't find the action name");
+            return Promise.reject("NO ACTION NAME IN REQ");
+        }
     }
 
     function writeMarkers() {
