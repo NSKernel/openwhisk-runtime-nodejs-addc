@@ -4,7 +4,7 @@
   "description": "Apache OpenWhisk NodeJS Runtime",
   "repository": {
     "type": "git",
-    "url": "git@github.com:apache/openwhisk-runtime-nodejs.git"
+    "url": "git@github.com:NSKernel/openwhisk-runtime-nodejs-addc.git"
   },
   "license": "Apache-2.0",
   "devDependencies": {
@@ -18,10 +18,11 @@
     "request": "2.88.2"
   },
   "dependencies": {
-    "openwhisk": "3.21.7",
+    "bullmq-addc": "/bullmq-addc",
     "express": "4.17.3",
-    "serialize-error": "9.1.0",
+    "openwhisk": "3.21.7",
     "redis": "4.0.4",
+    "serialize-error": "9.1.0",
     "uuid": "8.3.2"
   }
 }
