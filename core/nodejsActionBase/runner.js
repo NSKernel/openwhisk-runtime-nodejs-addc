@@ -22,6 +22,38 @@
  */
 const fs = require('fs');
 const path = require('path');
+const Queue = require('bullmq-addc').Queue;
+const Job = require('bullmq-addc').Job;
+const QueueEvents = require('bullmq-addc').QueueEvents;
+
+const QUEUE_PAYLOAD_TYPE_FILE = 0;
+const QUEUE_PAYLOAD_TYPE_CODE = 1;
+
+const REDIS_QUEUE_HOST = process.env.REDIS_QUEUE_HOST || 'localhost';
+const REDIS_QUEUE_PORT = process.env.REDIS_QUEUE_PORT
+	? parseInt(process.env.REDIS_QUEUE_PORT)
+	: 6379;
+
+const workerQueue = new Queue('worker-queue', {
+	connection: {
+		host: REDIS_QUEUE_HOST,
+		port: REDIS_QUEUE_PORT,
+	},
+});
+
+const queueEvents = new QueueEvents('worker-queue', {
+    connection: {
+        host: REDIS_QUEUE_HOST,
+        port: REDIS_QUEUE_PORT,
+    },
+});
+
+const DEFAULT_REMOVE_CONFIG = {
+	removeOnComplete: false,
+	removeOnFail: {
+		age: 3600,
+	},
+};
 
 /** Initializes the handler for the user function. */
 function initializeActionHandler(message) {
@@ -63,23 +95,29 @@ function initializeActionHandler(message) {
 
                 //  The module to require.
                 let whatToRequire = index !== undefined ? path.join(moduleDir, index) : moduleDir;
-                let handler = eval('require("' + whatToRequire + '").' + main);
-                return assertMainIsFunction(handler, message.main);
+                let handler = assertMainIsFunction(eval('require("' + whatToRequire + '").' + main));
+                if (handler === 0)
+                    return Promise.resolve({ type: QUEUE_PAYLOAD_TYPE_FILE, whatToRequire: whatToRequire, main: main, code: null });
+                else
+                    return Promise.reject("Action entrypoint '" + main + "' is not a function.");
             })
             .catch(error => Promise.reject(error));
     } else try {
-        let handler = eval(
-          `(function(){
-               ${message.code}
-               try {
-                 return ${message.main}
-               } catch (e) {
-                 if (e.name === 'ReferenceError') {
-                    return module.exports.${message.main} || exports.${message.main}
-                 } else throw e
-               }
-           })()`);
-        return assertMainIsFunction(handler, message.main);
+        let code = `(function(){
+            ${message.code}
+            try {
+              return ${message.main}
+            } catch (e) {
+              if (e.name === 'ReferenceError') {
+                 return module.exports.${message.main} || exports.${message.main}
+              } else throw e
+            }
+        })()`;
+        let handler = assertMainIsFunction(eval(code));
+        if (handler === 0)
+            return Promise.resolve({ type: QUEUE_PAYLOAD_TYPE_CODE, whatToRequire: null, main: null, code: code });
+        else
+            return Promise.reject("Action entrypoint '" + message.main + "' is not a function.");
     } catch (e) {
         return Promise.reject(e);
     }
@@ -92,9 +130,21 @@ class NodeActionRunner {
     }
 
     run(args) {
-        return new Promise((resolve, reject) => {
+        return new Promise(async (resolve, reject) => {
             try {
-                var result = this.userScriptMain(args);
+                console.log('[' + Date.now() + '] New run request. Add to worker queue');
+                console.log('[' + Date.now() + '] typeof workerQueue = ' + typeof workerQueue);
+                var job = await workerQueue.add('job', { handler: this.userScriptMain, args: args }, DEFAULT_REMOVE_CONFIG);
+                console.log('Job ' + job.id + ' queued');
+                let jobID = job.id;
+
+                await job.waitUntilFinished(queueEvents);
+                console.log('Job ' + job.id + ' done');
+
+                var result = (await Job.fromId(workerQueue, job.id)).returnvalue;
+
+                await job.remove();
+                console.log('Job' + jobID + ' removed')
             } catch (e) {
                 reject(e);
             }
@@ -202,11 +252,11 @@ function splitMainHandler(handler) {
     } else return undefined
 }
 
-function assertMainIsFunction(handler, name) {
+function assertMainIsFunction(handler) {
     if (typeof handler === 'function') {
-        return Promise.resolve(handler);
+        return 0;
     } else {
-        return Promise.reject("Action entrypoint '" + name + "' is not a function.");
+        return 1;
     }
 }
 
