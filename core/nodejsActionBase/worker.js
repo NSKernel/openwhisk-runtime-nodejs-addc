@@ -1,5 +1,7 @@
 const Worker = require('bullmq-addc').Worker;
 const Job = require('bullmq-addc').Job;
+const process = require('process');
+const addc_addon = require('./addc-addon/build/Release/addc_addon');
 
 const REDIS_QUEUE_HOST = process.env.REDIS_QUEUE_HOST || 'localhost';
 const REDIS_QUEUE_PORT = process.env.REDIS_QUEUE_PORT
@@ -12,7 +14,7 @@ const QUEUE_PAYLOAD_TYPE_FILE = 0;
 const QUEUE_PAYLOAD_TYPE_CODE = 1;
 
 async function jobProcessor(job) {
-	await job.log(`Started processing job with id ${job.id}`);
+	await job.log('Worker PID ' + process.pid + `: Started processing job with id ${job.id}`);
 	// console.log(`Job with id ${job.id}`, job.data);
 	let payload = job.data;
 
@@ -33,18 +35,21 @@ function setUpWorker() {
 			port: REDIS_QUEUE_PORT,
 		},
 		autorun: true,
+		checkin: addc_addon.addc_checkin,
+		register: addc_addon.addc_register_as_worker,
 	});
 
 	worker.on('completed', (job, returnvalue) => {
-		console.debug(`Completed job with id ${job.id}`, returnvalue);
+		console.debug('Worker PID ' + process.pid + `: Completed job with id ${job.id}`, returnvalue);
 	});
 
 	worker.on('active', (job) => {
-		console.debug(`Activated job with id ${job.id}`);
+		console.debug('Worker PID ' + process.pid + `: Activated job with id ${job.id}`);
 	});
 	worker.on('error', (failedReason) => {
-		console.error(`Job encountered an error`, failedReason);
+		console.error('Worker PID ' + process.pid + `: Job encountered an error`, failedReason);
 	});	
 }
 
+console.log('Worker PID ' + process.pid + " is alive");
 setUpWorker();

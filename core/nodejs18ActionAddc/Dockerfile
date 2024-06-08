@@ -47,6 +47,12 @@ RUN cd / && \
     yarn install --production && \
     yarn cache clean --force
 
+# Build our addon
+#
+RUN npm install -g node-gyp
+RUN cd /nodejsAction/addc-addon && node-gyp configure && node-gyp build
+
+
 # Install Redis server locally
 #
 RUN wget http://download.redis.io/redis-stable.tar.gz && \
@@ -58,9 +64,8 @@ RUN wget http://download.redis.io/redis-stable.tar.gz && \
     rm -r redis-stable && \
     npm install -g concurrently
 
-
 EXPOSE 8080
 EXPOSE 3011
 EXPOSE 6379
 
-CMD concurrently "/usr/bin/redis-server --bind '0.0.0.0'" "sleep 5s; node --expose-gc app.js" "sleep 5s; node --expose-gc worker.js"
+CMD concurrently "/usr/bin/redis-server --bind '0.0.0.0'" "sleep 5s; node --expose-gc app.js" "sleep 5s; node --expose-gc worker.js" "sleep 5s; node --expose-gc worker.js" "sleep 5s; node --expose-gc worker.js" "sleep 5s; node --expose-gc worker.js"

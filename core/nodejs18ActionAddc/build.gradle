@@ -26,6 +26,7 @@ eclipse {
 ext.dockerImageName = 'action-nodejs-v18-addc'
 apply from: '../../gradle/docker.gradle'
 
+distDocker.dependsOn 'copyAddon'
 distDocker.dependsOn 'copyPackageJson'
 distDocker.dependsOn 'copyProxy'
 distDocker.dependsOn 'copyRunner'
@@ -35,6 +36,12 @@ distDocker.dependsOn 'copyOpenWhisk'
 distDocker.dependsOn 'copyKnative'
 distDocker.dependsOn 'copyBuildTemplate'
 distDocker.finalizedBy('cleanup')
+
+task copyAddon(type: Copy) {
+    from '../../addc-addon/addc.cc'
+    from '../../addc-addon/binding.gyp'
+    into './addc-addon'
+}
 
 task copyPackageJson(type: Copy) {
     from '../nodejsActionBase/package.json'
@@ -84,4 +91,5 @@ task cleanup(type: Delete) {
     delete 'src'
     delete 'platform'
     delete 'buildtemplate.yaml'
+    delete 'addc-addon'
 }
