@@ -54,7 +54,7 @@ task copyProxy(type: Copy) {
 }
 
 task copyRunner(type: Copy) {
-    from '../nodejsActionBase/runner.js', '../nodejsActionBase/worker.js'
+    from '../nodejsActionBase/runner.js', '../nodejsActionBase/worker.js', '../nodejsActionBase/worker_normal.js'
     into '.'
 }
 
@@ -88,6 +88,7 @@ task cleanup(type: Delete) {
     delete 'app.js'
     delete 'runner.js'
     delete 'worker.js'
+    delete 'worker_normal.js'
     delete 'src'
     delete 'platform'
     delete 'buildtemplate.yaml'

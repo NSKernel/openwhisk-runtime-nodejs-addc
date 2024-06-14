@@ -35,8 +35,8 @@ function setUpWorker() {
 			port: REDIS_QUEUE_PORT,
 		},
 		autorun: true,
-		checkin: addc_addon.addc_checkin,
-		register: addc_addon.addc_register_as_worker,
+		checkin: null, // We are a regular worker so no checkin
+		register: null,
 	});
 
 	worker.on('completed', (job, returnvalue) => {
@@ -52,5 +52,4 @@ function setUpWorker() {
 }
 
 console.log('Worker PID ' + process.pid + " is alive");
-addc_addon.addc_register_as_worker();
 setUpWorker();

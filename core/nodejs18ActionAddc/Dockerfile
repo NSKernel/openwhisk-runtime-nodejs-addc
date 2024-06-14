@@ -64,8 +64,11 @@ RUN wget http://download.redis.io/redis-stable.tar.gz && \
     rm -r redis-stable && \
     npm install -g concurrently
 
+RUN chmod +x /nodejsAction/run.sh
+
 EXPOSE 8080
 EXPOSE 3011
 EXPOSE 6379
 
-CMD concurrently "/usr/bin/redis-server --bind '0.0.0.0'" "sleep 5s; node --expose-gc app.js" "sleep 5s; node --expose-gc worker.js" "sleep 5s; node --expose-gc worker.js" "sleep 5s; node --expose-gc worker.js" "sleep 5s; node --expose-gc worker.js"
+# CMD /bin/bash /nodejsAction/run.sh
+CMD concurrently "/usr/bin/redis-server --bind '0.0.0.0'" "sleep 5s; node --expose-gc app.js" "sleep 5s; node --expose-gc worker_normal.js" "sleep 5s; node --expose-gc worker.js" "sleep 5s; node --expose-gc worker.js" "sleep 5s; node --expose-gc worker.js"

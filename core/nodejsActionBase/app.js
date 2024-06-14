@@ -15,6 +15,22 @@
  * limitations under the License.
  */
 
+const addc_addon = require('./addc-addon/build/Release/addc_addon');
+
+addc_addon.addc_register();
+
+function gracefulShutdown() {
+    console.log('Shutting down gracefully and report to hypervisor');
+
+    addc_addon.addc_deregister();
+
+    console.log('Hypervisor notified');
+}
+
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);
+process.on('exit', gracefulShutdown);
+
 // __OW_ALLOW_CONCURRENT: see docs/concurrency.md
 var config = {
     'port': 8080,
