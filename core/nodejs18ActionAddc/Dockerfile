@@ -34,37 +34,31 @@ ADD  . /nodejsAction/
 COPY package.json /
 # COPY ../../bullmq-addc /
 
-# Build our modified BullMQ
+# Build Everything
 #
-RUN cd / && git clone https://github.com/NSKernel/bullmq-addc
-RUN yarn global add npm-run-all
-RUN cd /bullmq-addc && yarn install && yarn build
-
-# Customize runtime with additional packages.
-# Install package globally so user packages can override.
-#
-RUN cd / && \
+RUN cd / && git clone --depth=1 https://github.com/NSKernel/bullmq-addc && \
+    yarn global add npm-run-all && cd /bullmq-addc && yarn install && yarn build && \
+    cd / && \
     yarn install --production && \
-    yarn cache clean --force
-
-# Build our addon
-#
-RUN npm install -g node-gyp
-RUN cd /nodejsAction/addc-addon && node-gyp configure && node-gyp build
-
-
-# Install Redis server locally
-#
-RUN wget http://download.redis.io/redis-stable.tar.gz && \
+    yarn cache clean --force && \
+    npm install -g node-gyp && \
+    cd /nodejsAction/addc-addon && node-gyp configure && node-gyp build && \
+    wget http://download.redis.io/redis-stable.tar.gz && \
     tar xvzf redis-stable.tar.gz && \
+    rm redis-stable.tar.gz && \
     cd redis-stable && \
     make -j16 && \
     mv src/redis-server /usr/bin/ && \
     cd .. && \
     rm -r redis-stable && \
-    npm install -g concurrently
-
-RUN chmod +x /nodejsAction/run.sh
+    npm install -g concurrently && \
+    npm prune --production && \
+    rm -rf /bullmq-addc && \
+    cd /node_modules/bullmq-addc && echo before && du -sh . && yarn install --production && echo after && du -sh . && \
+    yarn cache clean && \
+    apt remove --purge -y gcc g++-10 libstdc++-10-dev gcc-10 && \
+    apt autoremove -y && \
+    chmod +x /nodejsAction/run.sh
 
 EXPOSE 8080
 EXPOSE 3011
